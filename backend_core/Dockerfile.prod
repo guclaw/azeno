@@ -1,4 +1,4 @@
-FROM python:3.10-alpine
+FROM python:3.10-alpine as builder
 
 WORKDIR /app
 
@@ -8,15 +8,24 @@ ENV PYTHONUNBUFFERED 1
 RUN apk update \
     && apk add postgresql-dev gcc python3-dev musl-dev
 
+RUN pip install flake8==5.0.4
+
+COPY . .
+RUN flake8 --ignore=E501,F401 .
+
 COPY Pipfile Pipfile.lock ./
 
 RUN pip install -U pipenv
 RUN pipenv install --system
 
-COPY ./entrypoint.sh .
-RUN chmod +x ./entrypoint.sh
+FROM builder
 
-COPY . .
-EXPOSE 8000
+ENV APP_HOME=/app
+WORKDIR $APP_HOME
+
+RUN addgroup -S app && adduser -S app -G app
+RUN chown -R app:app $APP_HOME
+
+USER app
 
 ENTRYPOINT ["./entrypoint.sh"]
